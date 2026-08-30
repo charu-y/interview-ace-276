@@ -1,7 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { CheckCircle2, AlertTriangle, Lightbulb, RotateCcw } from "lucide-react";
 
-import { getReport, getRole, type RoleId } from "@/lib/interview-data";
+import { getReport, getRole, type Report, type RoleId } from "@/lib/interview-data";
+import { loadReport } from "@/lib/report-parse";
+
 
 export const Route = createFileRoute("/report/$role")({
   head: () => ({
@@ -34,8 +37,16 @@ function scoreTone(score: number) {
 }
 
 function ReportPage() {
-  const { role, report } = Route.useLoaderData();
-  const weakest = report.scores[report.weakestIndex]!;
+  const { role, report: fallback } = Route.useLoaderData();
+  const [report, setReport] = useState<Report>(fallback);
+
+  useEffect(() => {
+    const stored = loadReport(role.id as RoleId);
+    if (stored) setReport(stored);
+  }, [role.id]);
+
+  const weakest = report.scores[report.weakestIndex] ?? report.scores[0]!;
+
 
   return (
     <main className="min-h-screen bg-background pb-20">
