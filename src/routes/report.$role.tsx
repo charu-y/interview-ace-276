@@ -1,7 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { CheckCircle2, AlertTriangle, Lightbulb, RotateCcw } from "lucide-react";
 
-import { getReport, getRole, type RoleId } from "@/lib/interview-data";
+import { getReport, getRole, type Report, type RoleId } from "@/lib/interview-data";
+import { loadReport } from "@/lib/report-parse";
+
 
 export const Route = createFileRoute("/report/$role")({
   head: () => ({
