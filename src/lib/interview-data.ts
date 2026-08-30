@@ -60,6 +60,8 @@ export const questionBank: Record<RoleId, string[]> = {
   ],
 };
 
+const q = (role: RoleId, i: number): string => questionBank[role][i]!;
+
 export type QuestionScore = {
   question: string;
   score: number;
@@ -79,11 +81,11 @@ const reports: Record<RoleId, Report> = {
   "sde-intern": {
     overall: 7.2,
     scores: [
-      { question: questionBank["sde-intern"][0], score: 8, note: "Clear, well-paced intro with a concrete motivation." },
-      { question: questionBank["sde-intern"][1], score: 7, note: "Good project detail, light on the debugging process." },
-      { question: questionBank["sde-intern"][2], score: 6, note: "Correct idea, but complexity was never stated." },
-      { question: questionBank["sde-intern"][3], score: 9, note: "Crisp definitions with strong real-world examples." },
-      { question: questionBank["sde-intern"][4], score: 5, note: "Jumped to coding instead of clarifying requirements." },
+      { question: q("sde-intern", 0), score: 8, note: "Clear, well-paced intro with a concrete motivation." },
+      { question: q("sde-intern", 1), score: 7, note: "Good project detail, light on the debugging process." },
+      { question: q("sde-intern", 2), score: 6, note: "Correct idea, but complexity was never stated." },
+      { question: q("sde-intern", 3), score: 9, note: "Crisp definitions with strong real-world examples." },
+      { question: q("sde-intern", 4), score: 5, note: "Jumped to coding instead of clarifying requirements." },
     ],
     strengths: [
       "Explains core CS concepts in plain language with useful examples.",
@@ -100,11 +102,11 @@ const reports: Record<RoleId, Report> = {
   "data-analyst": {
     overall: 7.0,
     scores: [
-      { question: questionBank["data-analyst"][0], score: 8, note: "Grounded intro tied to real datasets." },
-      { question: questionBank["data-analyst"][1], score: 6, note: "Missed checking for instrumentation/logging breakage." },
-      { question: questionBank["data-analyst"][2], score: 8, note: "Solid example, clearly explained." },
-      { question: questionBank["data-analyst"][3], score: 8, note: "Correct window-function approach." },
-      { question: questionBank["data-analyst"][4], score: 5, note: "Focused on the chart, not on the decision it drives." },
+      { question: q("data-analyst", 0), score: 8, note: "Grounded intro tied to real datasets." },
+      { question: q("data-analyst", 1), score: 6, note: "Missed checking for instrumentation/logging breakage." },
+      { question: q("data-analyst", 2), score: 8, note: "Solid example, clearly explained." },
+      { question: q("data-analyst", 3), score: 8, note: "Correct window-function approach." },
+      { question: q("data-analyst", 4), score: 5, note: "Focused on the chart, not on the decision it drives." },
     ],
     strengths: [
       "Strong SQL instincts — reaches for window functions naturally.",
@@ -121,11 +123,11 @@ const reports: Record<RoleId, Report> = {
   "frontend-developer": {
     overall: 7.4,
     scores: [
-      { question: questionBank["frontend-developer"][0], score: 8, note: "Great ownership signals in the projects described." },
-      { question: questionBank["frontend-developer"][1], score: 8, note: "Sensible boundaries between server and client state." },
-      { question: questionBank["frontend-developer"][2], score: 7, note: "Good instincts, but no mention of measuring first." },
-      { question: questionBank["frontend-developer"][3], score: 5, note: "Covered visuals; keyboard and ARIA semantics were thin." },
-      { question: questionBank["frontend-developer"][4], score: 9, note: "Excellent, practical view on tokens and review culture." },
+      { question: q("frontend-developer", 0), score: 8, note: "Great ownership signals in the projects described." },
+      { question: q("frontend-developer", 1), score: 8, note: "Sensible boundaries between server and client state." },
+      { question: q("frontend-developer", 2), score: 7, note: "Good instincts, but no mention of measuring first." },
+      { question: q("frontend-developer", 3), score: 5, note: "Covered visuals; keyboard and ARIA semantics were thin." },
+      { question: q("frontend-developer", 4), score: 9, note: "Excellent, practical view on tokens and review culture." },
     ],
     strengths: [
       "Thinks in systems — tokens, variants and reuse, not one-off styles.",
