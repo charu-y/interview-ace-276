@@ -1,8 +1,11 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
-import { Bot, Send, Timer, User } from "lucide-react";
+import { Bot, Loader2, Send, Timer, User } from "lucide-react";
 
-import { getRole, questionBank, type RoleId } from "@/lib/interview-data";
+import { getRole, type RoleId } from "@/lib/interview-data";
+import { askInterviewer, type ChatMessage } from "@/lib/interview.functions";
+import { extractReport, storeReport } from "@/lib/report-parse";
 import { addTurn, resetSession } from "@/lib/session-store";
 
 export const Route = createFileRoute("/interview/$role")({
@@ -11,12 +14,12 @@ export const Route = createFileRoute("/interview/$role")({
       { title: "Live Mock Interview — InterviewPilot" },
       {
         name: "description",
-        content: "Answer interview questions one at a time with a per-question timer.",
+        content: "Answer AI interview questions one at a time with a per-question timer.",
       },
       { property: "og:title", content: "Live Mock Interview — InterviewPilot" },
       {
         property: "og:description",
-        content: "A focused, timed interview chat that scores every answer.",
+        content: "A focused, timed AI interview chat that scores every answer.",
       },
     ],
   }),
@@ -29,68 +32,92 @@ export const Route = createFileRoute("/interview/$role")({
 });
 
 const SECONDS_PER_QUESTION = 120;
-
-type Message = { from: "ai" | "user"; text: string };
+const TOTAL_QUESTIONS = 5;
 
 function InterviewPage() {
   const { role } = Route.useLoaderData();
   const navigate = useNavigate();
-  const questions = questionBank[role.id as RoleId];
+  const ask = useServerFn(askInterviewer);
 
-  const [index, setIndex] = useState(0);
-  const [messages, setMessages] = useState<Message[]>([
-    { from: "ai", text: `Hi! I'm your interviewer for the ${role.title} role. Let's begin.` },
-    { from: "ai", text: questions[0]! },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [answer, setAnswer] = useState("");
+  const [thinking, setThinking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [asked, setAsked] = useState(0);
   const [remaining, setRemaining] = useState(SECONDS_PER_QUESTION);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    resetSession();
-  }, []);
+  const started = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, thinking]);
 
   useEffect(() => {
     setRemaining(SECONDS_PER_QUESTION);
     const id = setInterval(() => setRemaining((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(id);
-  }, [index]);
+  }, [asked]);
 
-  const total = questions.length;
-  const progress = Math.round((index / total) * 100);
+  async function send(history: ChatMessage[]) {
+    setThinking(true);
+    setError(null);
+    try {
+      const { content } = await ask({ data: { role: role.id as RoleId, messages: history } });
+      const report = extractReport(content);
+      if (report) {
+        storeReport(role.id as RoleId, report);
+        setMessages([
+          ...history,
+          {
+            role: "assistant",
+            content: "That's the last question — generating your report card…",
+          },
+        ]);
+        setTimeout(() => navigate({ to: "/report/$role", params: { role: role.id } }), 800);
+        return;
+      }
+      setMessages([...history, { role: "assistant", content }]);
+      setAsked((n) => Math.min(n + 1, TOTAL_QUESTIONS));
+    } catch (e) {
+      setMessages(history);
+      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+    } finally {
+      setThinking(false);
+    }
+  }
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    resetSession();
+    void send([
+      { role: "user", content: `I'm ready. Please begin the interview for the ${role.title} role with question 1.` },
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const currentQuestion = Math.min(asked || 1, TOTAL_QUESTIONS);
+  const progress = Math.round(((asked ? asked - 1 : 0) / TOTAL_QUESTIONS) * 100);
   const mins = String(Math.floor(remaining / 60)).padStart(2, "0");
   const secs = String(remaining % 60).padStart(2, "0");
   const low = remaining <= 20;
+  const lastQuestion =
+    [...messages].reverse().find((m) => m.role === "assistant")?.content ?? "";
 
   function submit() {
     const text = answer.trim();
-    if (!text) return;
+    if (!text || thinking) return;
 
     addTurn({
-      question: questions[index]!,
+      question: lastQuestion,
       answer: text,
       seconds: SECONDS_PER_QUESTION - remaining,
     });
     setAnswer("");
-
-    const next = index + 1;
-    if (next >= total) {
-      setMessages((m) => [
-        ...m,
-        { from: "user", text },
-        { from: "ai", text: "That's the last question — generating your report card…" },
-      ]);
-      setTimeout(() => navigate({ to: "/report/$role", params: { role: role.id } }), 900);
-      return;
-    }
-
-    setMessages((m) => [...m, { from: "user", text }, { from: "ai", text: questions[next]! }]);
-    setIndex(next);
+    void send([...messages, { role: "user", content: text }]);
   }
+
+  const visible = messages.filter((_, i) => i !== 0);
 
   return (
     <main className="flex min-h-screen flex-col bg-background">
@@ -110,7 +137,7 @@ function InterviewPage() {
           <div className="flex-1">
             <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
               <span>
-                Question {index + 1} of {total}
+                Question {currentQuestion} of {TOTAL_QUESTIONS}
               </span>
               <span>{progress}% complete</span>
             </div>
@@ -133,31 +160,45 @@ function InterviewPage() {
       </div>
 
       <section className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-6 py-8">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex gap-3 ${m.from === "user" ? "flex-row-reverse" : ""}`}
-          >
+        {visible.map((m, i) => (
+          <div key={i} className={`flex gap-3 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
             <div
               className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${
-                m.from === "ai"
+                m.role === "assistant"
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground"
               }`}
             >
-              {m.from === "ai" ? <Bot className="size-4" /> : <User className="size-4" />}
+              {m.role === "assistant" ? <Bot className="size-4" /> : <User className="size-4" />}
             </div>
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                m.from === "ai"
+              className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                m.role === "assistant"
                   ? "surface-card rounded-tl-sm text-foreground"
                   : "rounded-tr-sm bg-primary text-primary-foreground"
               }`}
             >
-              {m.text}
+              {m.content}
             </div>
           </div>
         ))}
+
+        {thinking && (
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Bot className="size-4" />
+            </div>
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Interviewer is thinking…
+            </span>
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
         <div ref={bottomRef} />
       </section>
 
@@ -178,11 +219,11 @@ function InterviewPage() {
           />
           <button
             onClick={submit}
-            disabled={!answer.trim()}
+            disabled={!answer.trim() || thinking}
             className="inline-flex h-[56px] items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             <Send className="size-4" />
-            {index + 1 === total ? "Finish" : "Send"}
+            {asked >= TOTAL_QUESTIONS ? "Finish" : "Send"}
           </button>
         </div>
       </footer>
