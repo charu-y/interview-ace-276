@@ -37,8 +37,16 @@ function scoreTone(score: number) {
 }
 
 function ReportPage() {
-  const { role, report } = Route.useLoaderData();
-  const weakest = report.scores[report.weakestIndex]!;
+  const { role, report: fallback } = Route.useLoaderData();
+  const [report, setReport] = useState<Report>(fallback);
+
+  useEffect(() => {
+    const stored = loadReport(role.id as RoleId);
+    if (stored) setReport(stored);
+  }, [role.id]);
+
+  const weakest = report.scores[report.weakestIndex] ?? report.scores[0]!;
+
 
   return (
     <main className="min-h-screen bg-background pb-20">
