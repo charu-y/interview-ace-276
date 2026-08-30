@@ -1,4 +1,4 @@
-# Interview Ace
+# InterviewPilot — AI Mock Interview Bot
 
 Build "InterviewPilot" — a mock interview app:
 
